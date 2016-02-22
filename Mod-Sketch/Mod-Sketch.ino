@@ -1,4 +1,5 @@
-/* Mod Sketch v0.2.1 -- written by Craig Durkin / Comingle. */
+/* Mod Sketch v0.2.2 -- written by Craig Durkin / Comingle. */
+/* Additional Commands & Documentation added by Holger 'Lynxx' Hippenstiel */
 /* This software comes pre-loaded on Comingle Mod sex toys */
 
 // Include necessary libraries: Wire.h and WiiChuck.h for the nunchuck, OSSex.h for the Mod library
@@ -9,7 +10,34 @@
 // Add the pattern library.
 #include "patterns.h"
 
+/*
+Available commands over Serial:
+- <n>         = Set Value for all Motors : Returns nothing
+0 <n>         = Set Value for Motor 1 : Return current Value
+1 <n>         = Set Value for Motor 2 : Return current Value
+2 <n>         = Set Value for Motor 3 : Return current Value
+c             = Cycle Pattern : Returns running pattern
+g             = Get number of currently running pattern : Returns running pattern
+i             = Read input 0 or 1 : Returns value of input
+l <n>         = Set LED power : Return current Value
+p             = Decrease Power : Returns new Powerlevel
+P             = Increase Power : Returns new Powerlevel
+r <n>         = Run a specific pattern, r,0; r,1; etc. : Returns running pattern
+s             = Stop all Motors, reset Patternnumber, Power & Timescale : Returns nothing
+t             = Decrease pattern time, as in everything goes faster : Returns new Timescale
+T             = Increase pattern time, as in everything goes slower : Returns new Timescale
+{<n>,<n>,<n>} = Set Value for Motor1,2 and 3 in a single line : Returns nothing
+
+New from v0.2.2:
+G = get Powerlevel : Returns Powerlevel
+v = get Version : Returns Version information
+*/
+
+const String txtVersion = "Dilduino v0.2.2";
+
 void setup() {
+	Toy.setID(1); // Beta Version
+	
   // Button will increase/decrease power by 20%
   Toy.setPowerScaleStep(0.2);
   
@@ -40,69 +68,92 @@ void setup() {
   Serial.begin(9600);
 }
 
-
-
 void loop() {
   serialProcessor();
 }
 
-// Serial console. Read a character in to command[1], and a value in to val
+// Serial console. Read a character in to inChar, and a value in to val
 void serialProcessor() { 
-  char command[1];
-  byte val;
-
   if (Serial.available() > 0) {
-    Serial.readBytes(command,1);
-    if (command[0] == 'l') { // Set LED power
-      val = Serial.parseInt();
-      Toy.setLED(0,val);
-      Serial.println(val);
-    } else if (command[0] == '0' || command[0] == '1' || command[0] == '2') { // Set power of individual motor
-      val = Serial.parseInt();
-      Toy.setOutput(command[0], val);
-      Serial.println(val);
-    } else if (command[0] == '-') { // Catch '-1', set power of all motors
-      int out = Serial.parseInt();
-      out *= -1;
-      val = Serial.parseInt();
-      Toy.setOutput(out,val);
-    } else if (command[0] == '{') {
-      int motors[3];
-      motors[0] = Serial.parseInt();
-      motors[1] = Serial.parseInt();
-      motors[2] = Serial.parseInt();
-      for (int i = 0; i < 3; i++) {
-        if (motors[i] >= 0) {
-          Toy.setOutput(i, motors[i]);
-        }
+  	char inChar = Serial.read();
+    byte val;
+    switch (inChar) {
+    	case 'l': // Set LED-Power
+        val = Serial.parseInt();
+        Toy.setLED(0,val);
+        Serial.println(val);
+        break;
+      case '0': // Set Power for Motor1-3 directly
+      case '1':
+      case '2':
+        val = Serial.parseInt();
+        Toy.setOutput(inChar, val);
+        Serial.println(val);
+        break;
+      case '-':  // Catch '-1', set power of all motors
+      {
+        int out = Serial.parseInt();
+        out *= -1;
+        val = Serial.parseInt();
+        Toy.setOutput(out,val);
+        break;
       }
-    } else if (command[0] == 'p') {
-      Serial.println(Toy.decreasePower());
-    } else if (command[0] == 'P') {
-      Serial.println(Toy.increasePower());
-    } else if (command[0] == 't') { // Decrease pattern time, as in everything goes faster
-      Serial.println(Toy.decreaseTime());
-    } else if (command[0] == 'T') {
-      Serial.println(Toy.increaseTime());
-    } else if (command[0] == 'r') { // Run a specific pattern, r,0; r,1; etc.
-      val = Serial.parseInt();
-      Toy.runPattern(val);
-      Serial.println(Toy.getPattern());
-    } else if (command[0] == 'g') {  // Get number of currently running pattern
-      Serial.println(Toy.getPattern());
-    } else if (command[0] == 's') {
-      Toy.stop();
-    } else if (command[0] == 'c') {
-      Toy.cyclePattern();
-      Serial.println(Toy.getPattern());
-    } else if (command[0] == 'i') { // Read input 0 or 1 and print it to serial port
-      int in = Serial.parseInt();
-      in %= Toy.device.inCount;
-      Serial.println(Toy.getInput(in));
+      case '{': // Set Power for all 3 Motors in a single line
+        int motors[3];
+        motors[0] = Serial.parseInt();
+        motors[1] = Serial.parseInt();
+        motors[2] = Serial.parseInt();
+        for (int i = 0; i < 3; i++) {
+          if (motors[i] >= 0) {
+            Toy.setOutput(i, motors[i]);
+          }
+        }
+        break;
+      case 'p': // Decrease Toy power, same as longpressing the button
+        Serial.println(Toy.decreasePower());
+        break;
+      case 'P': // Increase Toy power, same as doubleclicking the button
+        Serial.println(Toy.increasePower());
+        break;
+      case 't': // Decrease pattern time, as in everything goes faster
+        Serial.println(Toy.decreaseTime());
+        break;
+      case 'T': // Increase pattern time, as in everything goes slower : Returns new Timescale
+        Serial.println(Toy.increaseTime());
+        break;
+      case 'r': // Run a specific pattern, r,0; r,1; r 2 etc.
+        val = Serial.parseInt();
+        Toy.runPattern(val);
+        Serial.println(Toy.getPattern());
+        break;
+      case 'g': // Get number of currently running pattern
+        Serial.println(Toy.getPattern());
+        break;
+      case 's': // Stop all Motors, reset Patternnumber, Power & Timescale
+        Toy.stop();
+        break;
+      case 'c': // Cycle Pattern, same as single clicking the button
+        Toy.cyclePattern();
+        Serial.println(Toy.getPattern());
+        break;
+      case 'i': // Read input 0 or 1 and print it to serial port
+      {
+        int in = Serial.parseInt();
+        in %= Toy.device.inCount;
+        Serial.println(Toy.getInput(in));
+        break;
+      }
+      case 'v': // Print Version information
+        Serial.println(txtVersion);
+        break;
+      case 'G': // Get the Powerlevel
+      	Serial.println(Toy.getPowerScaleFactor());
+      	break;
+      default:
+      	Serial.println("Unknown command: "+inChar);
     }
   }
 }
-
 
 // Cycle through all the outputs, turn the LED on and leave it on to show that we're on
 void startupSequence() {
@@ -139,5 +190,3 @@ void doubleClick() {
 void longPress() {
   Toy.decreasePower();
 }
-
-
